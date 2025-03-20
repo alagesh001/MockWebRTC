@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "984962139171",
+    "firebase_url": "https://mckwbrtc-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "mckwbrtc",
+    "storage_bucket": "mckwbrtc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:984962139171:android:18ca614a7c568a63031d96",
+        "android_client_info": {
+          "package_name": "com.p2pcall.mockwebrtc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfidGa6bHVWBDPIQtHUj5_L1Q94wTiFqA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
