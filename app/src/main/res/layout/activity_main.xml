@@ -5,20 +5,27 @@
 
     <!-- Remote Video View (Full Screen) -->
     <org.webrtc.SurfaceViewRenderer
-        android:id="@+id/remoteView"
+        android:id="@+id/localView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#000000"/>
+        />
 
     <!-- Local Video View (Small Preview) -->
     <org.webrtc.SurfaceViewRenderer
-        android:id="@+id/localView"
+        android:id="@+id/remoteView"
         android:layout_width="120dp"
         android:layout_height="160dp"
         android:layout_margin="16dp"
-        android:background="#222222"
+
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        >
+
     <Button
         android:id="@+id/btnGenerateOffer"
         android:layout_width="wrap_content"
@@ -26,6 +33,15 @@
         android:text="Generate Offer"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="10dp"/>
+    <Button
+        android:id="@+id/btnAnswerOffer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Answer "
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="10dp"/>
+    </LinearLayout>
+
     <!-- Control Buttons -->
     <LinearLayout
         android:layout_width="wrap_content"
