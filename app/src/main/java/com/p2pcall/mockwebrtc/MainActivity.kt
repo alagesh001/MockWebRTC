@@ -14,6 +14,7 @@ import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import com.google.gson.Gson
 import org.webrtc.*
+import org.webrtc.PeerConnection.IceConnectionState
 import org.webrtc.PeerConnection.IceServer
 
 class MainActivity : AppCompatActivity() {
@@ -57,7 +58,7 @@ class MainActivity : AppCompatActivity() {
         btnSwitchCamera.setOnClickListener { switchCamera() }
         btnGenerateOffer.setOnClickListener {
             Log.d("afdasasf","createOffer click")
-
+            iamoffer = true
             createOffer()
            //setRemoteAnswer("h")
 
@@ -65,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         btnAnswerOffer.setOnClickListener {
            // createOffer()
             Log.d("afdasasf","btnAnswerOffer click")
-
+            iamoffer = false
             fetchAndSetRemoteSdp(true)
             //setRemoteAnswer("h")
 
@@ -124,6 +125,10 @@ class MainActivity : AppCompatActivity() {
         localVideoTrack.addSink(localView)
 
 
+        remoteView.init(eglBaseContext, null)
+        remoteView.setMirror(false)
+        remoteView.setEnableHardwareScaler(true)
+
 
         // localView.init(EglBase.create().eglBaseContext, null)
        // remoteView.init(EglBase.create().eglBaseContext, null)
@@ -136,6 +141,16 @@ class MainActivity : AppCompatActivity() {
             override fun onSignalingChange(p0: PeerConnection.SignalingState?) {
                 Log.d("afdasasf"," onSignalingChange ${Gson().toJson(p0)} ")
 
+            }
+
+            override fun onTrack(transceiver: RtpTransceiver?) {
+                super.onTrack(transceiver)
+                transceiver?.receiver?.track()?.let { track ->
+                    if (track is VideoTrack) {
+                        Log.d("WebRTCdsf", "✅ Remote video track received!")
+                        track.addSink(remoteView) // Attach track to SurfaceViewRenderer
+                    }
+                }
             }
 
             override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {
@@ -154,8 +169,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onIceCandidate(candidate: IceCandidate?) {
-                Log.d("afdasasf"," onIceCandidate ")
+                Log.d("afdasasf","BBB iamoffer $iamoffer")
 
+                Log.d("afdasasf"," onIceCandidate $iamoffer")
+               // localPeer.addIceCandidate(candidate)
+                storeIceCandidate(candidate!!,iamoffer)
                 runOnUiThread {
                     Toast.makeText(this@MainActivity, "New ICE Candidate", Toast.LENGTH_SHORT).show()
                 }
@@ -193,9 +211,21 @@ class MainActivity : AppCompatActivity() {
 
 
     }
+    private var iamoffer = true
+    fun storeIceCandidate(candidate: IceCandidate,isOffer: Boolean) {
+        val cantype = if (isOffer) "offerCandidate" else "remoteCandidate"
 
+        val candidateMap = mapOf(
+            "sdpMid" to candidate.sdpMid,
+            "sdpMLineIndex" to candidate.sdpMLineIndex,
+            "candidate" to candidate.sdp
+        )
+
+        database.child(cantype).push().setValue(candidateMap)
+    }
     private fun createOffer() {
         val constraints = MediaConstraints()
+        Log.d("afdasasf","AAA iamoffer $iamoffer")
 
         localPeer.createOffer(object : SdpObserver {
             override fun onCreateSuccess(sessionDescription: SessionDescription?) {
@@ -203,7 +233,7 @@ class MainActivity : AppCompatActivity() {
                 localPeer.setLocalDescription(this, sessionDescription)
                 Log.d("afdasasf","oncreate success ${Gson().toJson(sessionDescription)}")
                 storeSessionDescription(sessionDescription!!, true)
-
+                fetchAndSetRemoteSdp(false)
                 runOnUiThread {
                     Toast.makeText(this@MainActivity, "SDP Offer Created", Toast.LENGTH_SHORT).show()
                 }
@@ -232,6 +262,8 @@ class MainActivity : AppCompatActivity() {
         )
 
         val sdpType = if (isOffer) "offer" else "answer"
+        database.child("answer").setValue("")
+
         database.child(sdpType).setValue(sdpMap)
             .addOnSuccessListener { Log.d("WebRTC", "SDP stored in Firebase") }
             .addOnFailureListener { Log.e("WebRTC", "Failed to store SDP: ${it.message}") }
@@ -260,46 +292,117 @@ class MainActivity : AppCompatActivity() {
     }
     fun fetchAndSetRemoteSdp(isOffer: Boolean) {
         val sdpType = if (isOffer) "offer" else "answer"
+        Log.d("afdasasfAA","fetchAndSetRemoteSdp setupppp")
+        database.child(sdpType).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d("afdasasfAA","fetchAndSetRemoteSdp setupppp")
 
-        database.child(sdpType).get().addOnSuccessListener { snapshot ->
-            val data = snapshot.value as? Map<String, String> ?: return@addOnSuccessListener
-            Log.d("afdasasf","fetch database ${Gson().toJson(data)}")
+                if (snapshot.exists()) {
 
-            val sdp = SessionDescription(
-                SessionDescription.Type.fromCanonicalForm(data["type"] ?: "offer"),
-                data["description"] ?: ""
-            )
-            localPeer.setRemoteDescription(object : SdpObserver {
+                    val data = snapshot.value as? Map<String, String> ?: null
 
-                override fun onCreateFailure(error: String?) {
-                    Log.d("afdasasf","oncreate onCreateFailure ${Gson().toJson(error)}")
+                    val sdp = SessionDescription(
+                        SessionDescription.Type.fromCanonicalForm(data?.get("type") ?: "offer"),
+                        data?.get("description") ?: ""
+                    )
+                    localPeer.setRemoteDescription(object : SdpObserver {
 
-                }
+                        override fun onCreateFailure(error: String?) {
+                            Log.d("afdasasf", "oncreate onCreateFailure ${Gson().toJson(error)}")
 
-                override fun onCreateSuccess(p0: SessionDescription?) {
-                    Log.d("afdasasf","oncreate onCreateSuccess ${Gson().toJson(p0)}")
+                        }
 
+                        override fun onCreateSuccess(p0: SessionDescription?) {
+                            Log.d(
+                                "afdasasf", "oncreate onCreateSuccess ${Gson().toJson(p0)}"
+
+                            )
+
+                        }
+
+                        override fun onSetSuccess() {
+                            Log.d("afdasasf", "oncreate $sdpType  onSetSuccess ${Gson().toJson(sdp)}")
+                            if(isOffer) {
+                                localPeer.createAnswer(object : SdpObserver {
+                                    override fun onCreateSuccess(answer: SessionDescription?) {
+                                        Log.d("afdasasf", "✅ Created answer SDP.")
+                                        localPeer.setLocalDescription(this, answer)
+                                        storeSessionDescription(answer!!, false)
+                                        // Send the answer to Firebase
+                                        // sendSessionDescriptionToFirebase(answer)
+                                    }
+
+                                    override fun onCreateFailure(error: String?) {
+                                        Log.e("WebRTC", "❌ Failed to create answer: $error")
+                                    }
+
+                                    override fun onSetSuccess() {}
+                                    override fun onSetFailure(error: String?) {}
+                                }, MediaConstraints())
                             }
+                            localPeer.iceConnectionState().let { state ->
+                                Log.d("WebRTsaC", "ICE Connection State: $state")
 
-                override fun onSetSuccess() {
-                    Log.d("afdasasf","oncreate onSetSuccess ${Gson().toJson(sdp)}")
+                                when (state) {
+                                    IceConnectionState.CONNECTED -> {
+                                        Log.d("WebRTsaC", "ICE Connection Successful! 🔥")
 
+                                    }
+
+                                    IceConnectionState.FAILED -> {
+                                        Log.e("WebRTsaC", "ICE Connection Failed! ❌")
+                                    }
+
+                                    IceConnectionState.CHECKING -> {
+                                        Log.d("WebRTsaC", "Checking ICE Connection... ⏳")
+                                    }
+
+                                    IceConnectionState.DISCONNECTED -> {
+                                        Log.w("WebRTsaC", "ICE Disconnected! 🔄")
+                                    }
+
+                                    else -> Log.d("WebRTsaC", "ICE State: $state")
+                                }
+                            }
+                            fetchIceCandidates()
+                        }
+
+                        override fun onSetFailure(error: String?) {
+
+                            Log.d("afdasasf", "oncreate onSetFailure ${Gson().toJson(error)}")
+
+                        }
+                    }, sdp)
                 }
-                override fun onSetFailure(error: String?) {
+            }
 
-                    Log.d("afdasasf","oncreate onSetFailure ${Gson().toJson(error)}")
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("Firebase", "❌ Database error: ${error.message}")
+            }
+        })
 
-                }
-            }, sdp)
-    /*        localPeer.setRemoteDescription(object : SdpObserver {
-                override fun onSetSuccess() { Log.d("WebRTC", "Remote SDP set successfully") }
-                override fun onSetFailure(error: String?) { Log.e("WebRTC", "Failed to set remote SDP: $error") }
-                override fun onCreateSuccess(sdp: SessionDescription?) {}
-                override fun onCreateFailure(error: String?) {}
-            }, sdp)*/
-        }.addOnFailureListener {
-            Log.e("afdasasf", "Failed to fetch SDP: ${it.message}")
-        }
+    }
+    fun fetchIceCandidates() {
+        val cantype = if (iamoffer) "remoteCandidate" else "offerCandidate"
+
+        database.child(cantype).addChildEventListener(object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+
+                val data = snapshot.value as? Map<String, Any> ?: return
+                Log.d("afdasasf","$cantype  ${Gson().toJson(data)}")
+
+                val candidate = IceCandidate(
+                    data["sdpMid"] as String?,
+                    (data["sdpMLineIndex"] as Long).toInt(),
+                    data["candidate"] as String
+                )
+                localPeer.addIceCandidate(candidate)
+            }
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {}
+        })
     }
     private fun setRemoteAnswer(sdp: String) {
         Log.d("WebRTCAA", "A")
